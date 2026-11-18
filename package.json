@@ -1,0 +1,24 @@
+{
+  "name": "interswitch-discovery-registration",
+  "private": true,
+  "version": "1.0.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "db:setup": "node -e \"import('./api/_lib/db.js').then(async (db) => { await db.ensureDatabaseInitialized(); console.log('Render DB table verified/created.'); process.exit(0); }).catch((err) => { console.error('DB setup failed:', err); process.exit(1); })\"",
+    "prebuild": "node scripts/seo.js",
+    "build": "npm run db:setup && vite build",
+    "preview": "vite preview"
+  },
+  "dependencies": {
+    "dotenv": "^18.0.10",
+    "nodemailer": "^6.10.1",
+    "pg": "^8.23.1",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1"
+  },
+  "devDependencies": {
+    "@vitejs/plugin-react": "^4.3.4",
+    "vite": "^5.4.11"
+  }
+}
