@@ -5,7 +5,6 @@ import PrivacyDialog from "../components/PrivacyDialog.jsx";
 const INITIAL_FORM = {
   firstName: "",
   secondName: "",
-  matricNumber: "",
   email: "",
   phone: "",
   department: "",
@@ -45,7 +44,6 @@ export default function Register() {
       fullName,
       full_name: fullName,
       name: fullName,
-      matric_number: form.matricNumber,
       hackathon_participation: form.hackathonParticipation,
       track: form.hackathonParticipation,
       focus_area: form.hackathonParticipation,
@@ -77,7 +75,6 @@ export default function Register() {
     <section className="ref-page-wrap">
       <div className="ref-split-card">
         <div className="ref-form-pane">
-
           <h2 className="ref-card-heading">Registration Form</h2>
 
           {error && <div className="alert-error">{error}</div>}
@@ -110,13 +107,24 @@ export default function Register() {
               </label>
             </div>
 
+            <label className="ref-field">
+              <span className="ref-label">Email</span>
+              <input
+                type="email"
+                name="email"
+                value={form.email}
+                onChange={handleChange}
+                required
+              />
+            </label>
+
             <div className="ref-grid-2">
               <label className="ref-field">
-                <span className="ref-label">Matric Number</span>
+                <span className="ref-label">Phone Number</span>
                 <input
-                  type="text"
-                  name="matricNumber"
-                  value={form.matricNumber}
+                  type="tel"
+                  name="phone"
+                  value={form.phone}
                   onChange={handleChange}
                   required
                 />
@@ -133,28 +141,6 @@ export default function Register() {
                 />
               </label>
             </div>
-
-            <label className="ref-field">
-              <span className="ref-label">Email</span>
-              <input
-                type="email"
-                name="email"
-                value={form.email}
-                onChange={handleChange}
-                required
-              />
-            </label>
-
-            <label className="ref-field">
-              <span className="ref-label">Phone Number</span>
-              <input
-                type="tel"
-                name="phone"
-                value={form.phone}
-                onChange={handleChange}
-                required
-              />
-            </label>
 
             <div className="ref-grid-2">
               <label className="ref-field">

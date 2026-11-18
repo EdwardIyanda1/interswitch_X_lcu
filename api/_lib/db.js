@@ -3,10 +3,10 @@ import pg from "pg";
 
 const { Pool } = pg;
 
-const connectionString = process.env.DATABASE_URL;
+const connectionString = (process.env.DATABASE_URL || "").trim();
 
 if (!connectionString) {
-  throw new Error("DATABASE_URL is missing in environment variables.");
+  throw new Error("DATABASE_URL is missing in .env");
 }
 
 const useSsl =
@@ -20,7 +20,7 @@ export const pool = new Pool({
   ssl: useSsl ? { rejectUnauthorized: false } : false,
   max: 10,
   idleTimeoutMillis: 30000,
-  connectionTimeoutMillis: 10000,
+  connectionTimeoutMillis: 20000,
 });
 
 export function getPool() {
@@ -59,6 +59,20 @@ const SCHEMA_SQL = `
   ALTER TABLE registrations ADD COLUMN IF NOT EXISTS focus_area TEXT;
   ALTER TABLE registrations ADD COLUMN IF NOT EXISTS track TEXT;
   ALTER TABLE registrations ADD COLUMN IF NOT EXISTS consent BOOLEAN DEFAULT TRUE;
+
+  CREATE OR REPLACE FUNCTION notify_registration_change()
+  RETURNS trigger AS $$
+  BEGIN
+    PERFORM pg_notify('registrations_channel', row_to_json(NEW)::text);
+    RETURN NEW;
+  END;
+  $$ LANGUAGE plpgsql;
+
+  DROP TRIGGER IF EXISTS trg_registrations_notify ON registrations;
+  CREATE TRIGGER trg_registrations_notify
+  AFTER INSERT OR UPDATE ON registrations
+  FOR EACH ROW
+  EXECUTE FUNCTION notify_registration_change();
 `;
 
 let initializedPromise = null;

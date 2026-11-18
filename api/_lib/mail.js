@@ -1,37 +1,44 @@
-import 'dotenv/config';
-import nodemailer from 'nodemailer';
-import { config } from './config.js';
+import "dotenv/config";
+import nodemailer from "nodemailer";
 
-let transporter;
+let transporter = null;
 
 export function getTransporter() {
   if (!transporter) {
-    if (!config.mail.user || !config.mail.appPassword) {
-      throw new Error('GMAIL_USER and GMAIL_APP_PASSWORD environment variables are required.');
+    const user = process.env.GMAIL_USER;
+    const pass = process.env.GMAIL_APP_PASSWORD;
+
+    if (!user || !pass) {
+      return null;
     }
 
     transporter = nodemailer.createTransport({
-      service: 'gmail',
-      auth: {
-        user: config.mail.user,
-        pass: config.mail.appPassword,
-      },
+      service: "gmail",
+      auth: { user, pass },
     });
   }
   return transporter;
 }
 
-export async function sendMail({ to, subject, html, text }) {
+export async function sendMail({ to, subject, text, html }) {
   const mailTransporter = getTransporter();
-  const senderAddress = config.mail.fromName
-    ? `"${config.mail.fromName}" <${config.mail.user}>`
-    : config.mail.user;
+  if (!mailTransporter) {
+    return null;
+  }
+
+  const fromName = process.env.MAIL_FROM_NAME || "Interswitch x LCU";
+  const fromEmail = process.env.GMAIL_USER;
 
   return mailTransporter.sendMail({
-    from: senderAddress,
+    from: `"${fromName}" <${fromEmail}>`,
     to,
     subject,
     text,
     html,
   });
 }
+
+export default {
+  getTransporter,
+  sendMail,
+};

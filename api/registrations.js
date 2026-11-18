@@ -20,7 +20,6 @@ export default async function handler(req, res) {
          second_name,
          email,
          phone,
-         matric_number,
          department,
          level,
          COALESCE(hackathon_participation, focus_area, track) AS hackathon_participation,

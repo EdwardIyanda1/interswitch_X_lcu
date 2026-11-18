@@ -477,3 +477,152 @@ tbody tr:hover {
     grid-template-columns: 1fr;
   }
 }
+
+/* Anchor Dashboard Table Directly Beneath the Header */
+.main-container:has(.ref-dashboard-top) {
+  justify-content: flex-start;
+  padding-top: 0.75rem;
+}
+
+.ref-dashboard-card {
+  padding: 1rem 0 2rem;
+}
+
+/* Skeleton Loading Animation */
+@keyframes skeletonShimmer {
+  0% {
+    background-position: -220px 0;
+  }
+  100% {
+    background-position: calc(220px + 100%) 0;
+  }
+}
+
+.skeleton-row td {
+  padding: 0.95rem 1rem;
+}
+
+.skeleton-bar {
+  display: inline-block;
+  height: 12px;
+  border-radius: 999px;
+  background-color: #eceef6;
+  background-image: linear-gradient(
+    90deg,
+    #eceef6 0px,
+    #f7f8fc 45px,
+    #eceef6 90px
+  );
+  background-size: 220px 100%;
+  background-repeat: no-repeat;
+  animation: skeletonShimmer 1.3s ease-in-out infinite;
+}
+
+.skeleton-w-xs {
+  width: 36px;
+}
+
+.skeleton-w-sm {
+  width: 72px;
+}
+
+.skeleton-w-md {
+  width: 105px;
+}
+
+.skeleton-w-lg {
+  width: 135px;
+}
+
+.skeleton-w-xl {
+  width: 185px;
+}
+
+/* Pagination Bar */
+.pagination-bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  margin-top: 1.25rem;
+  padding-top: 0.5rem;
+}
+
+.pagination-info {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.75rem;
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: var(--text-title);
+}
+
+.page-size-select {
+  padding: 0.25rem 0.5rem;
+  font-family: inherit;
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: var(--text-dark);
+  background: #f3f4f9;
+  border: 1px solid var(--line-border);
+  border-radius: 999px;
+  outline: none;
+  cursor: pointer;
+}
+
+.pagination-controls {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+}
+
+.page-btn {
+  min-width: 34px;
+  height: 34px;
+  padding: 0 0.85rem;
+  font-family: inherit;
+  font-size: 0.76rem;
+  font-weight: 600;
+  color: var(--text-dark);
+  background: #f3f4f9;
+  border: none;
+  border-radius: 999px;
+  cursor: pointer;
+  transition: background 150ms ease, color 150ms ease;
+}
+
+.page-btn:hover:not(:disabled) {
+  background: #e2e5f2;
+}
+
+.page-btn:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.page-btn-active {
+  background: var(--navy-btn) !important;
+  color: #ffffff !important;
+}
+
+.page-ellipsis {
+  font-size: 0.8rem;
+  color: var(--text-muted);
+  padding: 0 0.25rem;
+}
+
+@media (max-width: 840px) {
+  .ref-split-card {
+    grid-template-columns: 1fr;
+    min-height: auto;
+  }
+
+  .ref-art-pane {
+    display: none !important;
+  }
+
+  .ref-form-pane {
+    padding: 1.5rem 1.25rem;
+  }
+}

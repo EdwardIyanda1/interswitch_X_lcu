@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from "react";
+import React, { useState, useEffect, useMemo, useRef, useCallback } from "react";
 import { LEVELS, HACKATHON_OPTIONS, LOGOS } from "../config.js";
 
 const TOKEN_KEY = "discovery_admin_token";
@@ -174,50 +174,167 @@ export default function Dashboard() {
 
   const [registrations, setRegistrations] = useState([]);
   const [loading, setLoading] = useState(false);
+  const [liveConnected, setLiveConnected] = useState(false);
+  const [highlightedIds, setHighlightedIds] = useState({});
   const [error, setError] = useState("");
 
   const [search, setSearch] = useState("");
   const [levelFilter, setLevelFilter] = useState("");
   const [hackathonFilter, setHackathonFilter] = useState("");
 
+  const [currentPage, setCurrentPage] = useState(1);
+  const [pageSize, setPageSize] = useState(10);
+
   const interswitchSrc = LOGOS?.interswitch || "/logos/interswitch.svg";
   const lcuSrc = LOGOS?.lcu || "/logos/lcu.svg";
 
-  const fetchRegistrations = async (activeToken = token) => {
-    if (!activeToken) return;
-    setLoading(true);
-    setError("");
-    try {
-      const res = await fetch("/api/registrations", {
-        headers: {
-          Authorization: `Bearer ${activeToken}`,
-        },
-      });
-      if (res.status === 401) {
-        localStorage.removeItem(TOKEN_KEY);
-        setToken("");
-        return;
+  const mergeRegistration = useCallback((incoming) => {
+    if (!incoming) return;
+    const key = incoming.id || incoming.email;
+
+    setRegistrations((prev) => {
+      const idx = prev.findIndex(
+        (r) =>
+          (incoming.id && r.id === incoming.id) ||
+          (incoming.email &&
+            r.email &&
+            r.email.toLowerCase() === incoming.email.toLowerCase())
+      );
+
+      if (idx >= 0) {
+        const updated = [...prev];
+        updated[idx] = { ...updated[idx], ...incoming };
+        return updated;
       }
-      const data = await res.json().catch(() => ({}));
-      if (!res.ok) {
-        throw new Error(data.error || "Failed to load registrations");
-      }
-      const rows = Array.isArray(data)
-        ? data
-        : data.registrations || data.data || [];
-      setRegistrations(rows);
-    } catch (err) {
-      setError(err.message);
-    } finally {
-      setLoading(false);
+      return [incoming, ...prev];
+    });
+
+    if (key) {
+      setHighlightedIds((prev) => ({ ...prev, [key]: true }));
+      setTimeout(() => {
+        setHighlightedIds((prev) => {
+          const copy = { ...prev };
+          delete copy[key];
+          return copy;
+        });
+      }, 2800);
     }
-  };
+  }, []);
+
+  const fetchRegistrations = useCallback(
+    async (activeToken = token, silent = false) => {
+      if (!activeToken) return;
+      if (!silent) setLoading(true);
+      setError("");
+      try {
+        const res = await fetch("/api/registrations", {
+          headers: {
+            Authorization: `Bearer ${activeToken}`,
+          },
+        });
+        if (res.status === 401) {
+          localStorage.removeItem(TOKEN_KEY);
+          setToken("");
+          return;
+        }
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok) {
+          throw new Error(data.error || "Failed to load registrations");
+        }
+        const rows = Array.isArray(data)
+          ? data
+          : data.registrations || data.data || [];
+        setRegistrations(rows);
+      } catch (err) {
+        if (!silent) setError(err.message);
+      } finally {
+        if (!silent) setLoading(false);
+      }
+    },
+    [token]
+  );
+
+  // Real-Time PostgreSQL LISTEN/NOTIFY Stream (WhatsApp-style instant sync, zero Redis)
+  useEffect(() => {
+    if (!token) return;
+
+    let es = null;
+    let reconnectTimeout = null;
+    let fallbackInterval = null;
+    let unmounted = false;
+
+    setLoading(true);
+
+    const connectStream = () => {
+      if (unmounted) return;
+      const streamUrl = `/api/stream?token=${encodeURIComponent(token)}`;
+      es = new EventSource(streamUrl);
+
+      es.addEventListener("snapshot", (event) => {
+        if (unmounted) return;
+        try {
+          const payload = JSON.parse(event.data);
+          if (Array.isArray(payload.registrations)) {
+            setRegistrations(payload.registrations);
+          }
+          setError("");
+          setLoading(false);
+          setLiveConnected(true);
+        } catch {
+          // Ignore parse error
+        }
+      });
+
+      es.addEventListener("upsert", (event) => {
+        if (unmounted) return;
+        try {
+          const payload = JSON.parse(event.data);
+          if (payload.registration) {
+            mergeRegistration(payload.registration);
+          }
+        } catch {
+          // Ignore parse error
+        }
+      });
+
+      es.onerror = () => {
+        if (unmounted) return;
+        setLiveConnected(false);
+        es.close();
+        // Silent fetch & auto-reconnect if Vercel serverless stream times out
+        fetchRegistrations(token, true);
+        setLoading(false);
+        reconnectTimeout = setTimeout(connectStream, 3000);
+      };
+    };
+
+    connectStream();
+
+    // Silent safety sync when tab becomes visible or every 15s on serverless platforms
+    const handleVisibility = () => {
+      if (document.visibilityState === "visible") {
+        fetchRegistrations(token, true);
+      }
+    };
+    document.addEventListener("visibilitychange", handleVisibility);
+
+    fallbackInterval = setInterval(() => {
+      fetchRegistrations(token, true);
+    }, 15000);
+
+    return () => {
+      unmounted = true;
+      setLiveConnected(false);
+      if (es) es.close();
+      if (reconnectTimeout) clearTimeout(reconnectTimeout);
+      if (fallbackInterval) clearInterval(fallbackInterval);
+      document.removeEventListener("visibilitychange", handleVisibility);
+    };
+  }, [token, mergeRegistration, fetchRegistrations]);
 
   useEffect(() => {
-    if (token) {
-      fetchRegistrations(token);
-    }
-  }, [token]);
+    setCurrentPage(1);
+  }, [search, levelFilter, hackathonFilter, pageSize]);
 
   const handleLogin = async (e) => {
     e.preventDefault();
@@ -260,7 +377,7 @@ export default function Dashboard() {
       if (!item) return false;
       const name = String(item.full_name || item.fullName || item.name || "");
       const email = String(item.email || "");
-      const matric = String(item.matric_number || item.matricNumber || "");
+      const phone = String(item.phone || "");
       const dept = String(item.department || "");
       const level = String(item.level || "");
       const hackathon = String(
@@ -276,7 +393,7 @@ export default function Dashboard() {
         !q ||
         name.toLowerCase().includes(q) ||
         email.toLowerCase().includes(q) ||
-        matric.toLowerCase().includes(q) ||
+        phone.toLowerCase().includes(q) ||
         dept.toLowerCase().includes(q);
 
       const matchesLevel = !levelFilter || level === levelFilter;
@@ -287,13 +404,20 @@ export default function Dashboard() {
     });
   }, [registrations, search, levelFilter, hackathonFilter]);
 
+  const totalPages = Math.max(1, Math.ceil(filtered.length / pageSize));
+  const safePage = Math.min(currentPage, totalPages);
+
+  const paginatedRows = useMemo(() => {
+    const start = (safePage - 1) * pageSize;
+    return filtered.slice(start, start + pageSize);
+  }, [filtered, safePage, pageSize]);
+
   const exportCsv = () => {
     if (!filtered.length) return;
     const headers = [
       "Name",
       "Email",
       "Phone",
-      "Matric Number",
       "Department",
       "Level",
       "Hackathon",
@@ -303,7 +427,6 @@ export default function Dashboard() {
       r.full_name || r.fullName || r.name || "",
       r.email || "",
       r.phone || "",
-      r.matric_number || r.matricNumber || "",
       r.department || "",
       r.level || "",
       r.hackathon_participation ||
@@ -393,8 +516,8 @@ export default function Dashboard() {
   }
 
   return (
-    <section className="ref-page-wrap">
-      <div className="ref-white-card">
+    <section className="ref-page-wrap ref-dashboard-top">
+      <div className="ref-white-card ref-dashboard-card">
         <div className="dashboard-toolbar">
           <div className="ref-grid-3">
             <label className="ref-field">
@@ -438,10 +561,19 @@ export default function Dashboard() {
           </div>
 
           <div className="dashboard-actions">
+            <span
+              className={`live-indicator ${
+                liveConnected ? "live-online" : "live-syncing"
+              }`}
+              title={liveConnected ? "Live DB Sync" : "Syncing"}
+            >
+              <span className="live-dot" />
+            </span>
+
             <button
               type="button"
               className="ref-pill-btn ref-btn-sm"
-              onClick={() => fetchRegistrations(token)}
+              onClick={() => fetchRegistrations(token, false)}
               disabled={loading}
             >
               Refresh
@@ -450,7 +582,7 @@ export default function Dashboard() {
               type="button"
               className="ref-pill-btn ref-btn-sm"
               onClick={exportCsv}
-              disabled={!filtered.length}
+              disabled={!filtered.length || loading}
             >
               CSV
             </button>
@@ -473,33 +605,143 @@ export default function Dashboard() {
                 <th>Name</th>
                 <th>Email</th>
                 <th>Phone</th>
-                <th>Matric</th>
                 <th>Department</th>
                 <th>Level</th>
                 <th>Hackathon</th>
               </tr>
             </thead>
             <tbody>
-              {filtered.map((item, idx) => (
-                <tr key={item.id || item.email || idx}>
-                  <td>{item.full_name || item.fullName || item.name}</td>
-                  <td>{item.email}</td>
-                  <td>{item.phone}</td>
-                  <td>{item.matric_number || item.matricNumber}</td>
-                  <td>{item.department}</td>
-                  <td>{item.level}</td>
-                  <td>
-                    {item.hackathon_participation ||
-                      item.hackathonParticipation ||
-                      item.track ||
-                      item.focus_area ||
-                      item.focusArea}
-                  </td>
-                </tr>
-              ))}
+              {loading ? (
+                Array.from({ length: 6 }).map((_, idx) => (
+                  <tr key={`skeleton-${idx}`} className="skeleton-row">
+                    <td>
+                      <span className="skeleton-bar skeleton-w-lg" />
+                    </td>
+                    <td>
+                      <span className="skeleton-bar skeleton-w-xl" />
+                    </td>
+                    <td>
+                      <span className="skeleton-bar skeleton-w-md" />
+                    </td>
+                    <td>
+                      <span className="skeleton-bar skeleton-w-lg" />
+                    </td>
+                    <td>
+                      <span className="skeleton-bar skeleton-w-sm" />
+                    </td>
+                    <td>
+                      <span className="skeleton-bar skeleton-w-xs" />
+                    </td>
+                  </tr>
+                ))
+              ) : (
+                paginatedRows.map((item, idx) => {
+                  const rowKey = item.id || item.email || idx;
+                  const isNew = Boolean(
+                    highlightedIds[item.id] || highlightedIds[item.email]
+                  );
+                  return (
+                    <tr
+                      key={rowKey}
+                      className={isNew ? "row-live-flash" : ""}
+                    >
+                      <td>{item.full_name || item.fullName || item.name}</td>
+                      <td>{item.email}</td>
+                      <td>{item.phone}</td>
+                      <td>{item.department}</td>
+                      <td>{item.level}</td>
+                      <td>
+                        {item.hackathon_participation ||
+                          item.hackathonParticipation ||
+                          item.track ||
+                          item.focus_area ||
+                          item.focusArea}
+                      </td>
+                    </tr>
+                  );
+                })
+              )}
             </tbody>
           </table>
         </div>
+
+        {!loading && filtered.length > 0 && (
+          <div className="pagination-bar">
+            <div className="pagination-info">
+              <span>
+                {(safePage - 1) * pageSize + 1}–
+                {Math.min(safePage * pageSize, filtered.length)} /{" "}
+                {filtered.length}
+              </span>
+              <select
+                className="page-size-select"
+                value={pageSize}
+                onChange={(e) => setPageSize(Number(e.target.value))}
+                aria-label="Rows per page"
+              >
+                <option value={5}>5</option>
+                <option value={10}>10</option>
+                <option value={25}>25</option>
+                <option value={50}>50</option>
+              </select>
+            </div>
+
+            <div className="pagination-controls">
+              <button
+                type="button"
+                className="page-btn"
+                onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
+                disabled={safePage <= 1}
+              >
+                Prev
+              </button>
+
+              {Array.from({ length: totalPages }, (_, i) => i + 1)
+                .filter(
+                  (pageNum) =>
+                    pageNum === 1 ||
+                    pageNum === totalPages ||
+                    Math.abs(pageNum - safePage) <= 1
+                )
+                .reduce((acc, pageNum, idx, arr) => {
+                  if (idx > 0 && pageNum - arr[idx - 1] > 1) {
+                    acc.push("ellipsis-" + pageNum);
+                  }
+                  acc.push(pageNum);
+                  return acc;
+                }, [])
+                .map((entry) =>
+                  typeof entry === "string" ? (
+                    <span key={entry} className="page-ellipsis">
+                      …
+                    </span>
+                  ) : (
+                    <button
+                      key={entry}
+                      type="button"
+                      className={`page-btn ${
+                        entry === safePage ? "page-btn-active" : ""
+                      }`}
+                      onClick={() => setCurrentPage(entry)}
+                    >
+                      {entry}
+                    </button>
+                  )
+                )}
+
+              <button
+                type="button"
+                className="page-btn"
+                onClick={() =>
+                  setCurrentPage((p) => Math.min(totalPages, p + 1))
+                }
+                disabled={safePage >= totalPages}
+              >
+                Next
+              </button>
+            </div>
+          </div>
+        )}
       </div>
     </section>
   );
