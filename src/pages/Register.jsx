@@ -89,7 +89,6 @@ export default function Register() {
                   name="firstName"
                   value={form.firstName}
                   onChange={handleChange}
-                  placeholder="Name"
                   required
                 />
               </label>
@@ -101,12 +100,10 @@ export default function Register() {
                   name="secondName"
                   value={form.secondName}
                   onChange={handleChange}
-                  placeholder="Name"
                   required
                 />
               </label>
             </div>
-
             <label className="ref-field">
               <span className="ref-label">Email</span>
               <input
