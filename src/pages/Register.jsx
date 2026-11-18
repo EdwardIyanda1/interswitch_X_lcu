@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { FOCUS_AREAS, LEVELS, LOGOS } from "../config.js";
+import { HACKATHON_OPTIONS, LEVELS, LOGOS } from "../config.js";
 import PrivacyDialog from "../components/PrivacyDialog.jsx";
 
 const INITIAL_FORM = {
@@ -10,7 +10,7 @@ const INITIAL_FORM = {
   phone: "",
   department: "",
   level: "",
-  focusArea: "",
+  hackathonParticipation: "",
   consent: true,
 };
 
@@ -46,8 +46,9 @@ export default function Register() {
       full_name: fullName,
       name: fullName,
       matric_number: form.matricNumber,
-      track: form.focusArea,
-      focus_area: form.focusArea,
+      hackathon_participation: form.hackathonParticipation,
+      track: form.hackathonParticipation,
+      focus_area: form.hackathonParticipation,
     };
 
     try {
@@ -75,15 +76,7 @@ export default function Register() {
   return (
     <section className="ref-page-wrap">
       <div className="ref-split-card">
-        {/* Left White Panel */}
         <div className="ref-form-pane">
-          <div className="ref-brand-row">
-            <span className="brand-cube" aria-hidden="true" />
-            <div className="ref-brand-logos">
-              <img src={interswitchSrc} alt="Interswitch" />
-              <img src={lcuSrc} alt="LCU" />
-            </div>
-          </div>
 
           <h2 className="ref-card-heading">Registration Form</h2>
 
@@ -182,17 +175,17 @@ export default function Register() {
               </label>
 
               <label className="ref-field">
-                <span className="ref-label">Focus Area</span>
+                <span className="ref-label">Pitch / Participate in Hackathon</span>
                 <select
-                  name="focusArea"
-                  value={form.focusArea}
+                  name="hackathonParticipation"
+                  value={form.hackathonParticipation}
                   onChange={handleChange}
                   required
                 >
                   <option value="" disabled></option>
-                  {(FOCUS_AREAS || []).map((area) => (
-                    <option key={area} value={area}>
-                      {area}
+                  {(HACKATHON_OPTIONS || ["Yes", "No"]).map((opt) => (
+                    <option key={opt} value={opt}>
+                      {opt}
                     </option>
                   ))}
                 </select>
@@ -226,7 +219,6 @@ export default function Register() {
           </form>
         </div>
 
-        {/* Right Dark Space & Rocket Illustration Panel */}
         <div className="ref-art-pane" aria-hidden="true">
           <svg
             className="ref-rocket-svg"

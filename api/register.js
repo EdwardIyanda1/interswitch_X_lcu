@@ -1,64 +1,111 @@
 import { db } from "./_lib/db.js";
-import { sendConfirmation } from "./_lib/mail.js";
-
-const LEVELS = ["100 Level", "200 Level", "300 Level", "400 Level", "500 Level", "Postgraduate"];
-
-const clean = (v) => (typeof v === "string" ? v.trim().replace(/\s+/g, " ") : "");
+import { sendMail } from "./_lib/mail.js";
 
 export default async function handler(req, res) {
   if (req.method !== "POST") {
-    res.setHeader("Allow", "POST");
-    return res.status(405).json({ error: "Method not allowed." });
+    return res.status(405).json({ error: "Method not allowed" });
   }
 
-  const body = req.body && typeof req.body === "object" ? req.body : {};
-  const reg = {
-    firstName: clean(body.firstName),
-    lastName: clean(body.lastName),
-    phone: clean(body.phone),
-    email: clean(body.email).toLowerCase(),
-    department: clean(body.department),
-    level: clean(body.level),
-  };
+  const body =
+    typeof req.body === "string" ? JSON.parse(req.body || "{}") : req.body || {};
 
-  const errors = {};
-  if (reg.firstName.length < 2 || reg.firstName.length > 60) errors.firstName = "Enter your first name.";
-  if (reg.lastName.length < 2 || reg.lastName.length > 60) errors.lastName = "Enter your last name.";
-  if (!/^\+?[0-9\s-]{10,16}$/.test(reg.phone)) errors.phone = "Enter a valid phone number.";
-  if (!/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(reg.email) || reg.email.length > 120)
-    errors.email = "Enter a valid email address.";
-  if (reg.department.length < 2 || reg.department.length > 100) errors.department = "Enter your department.";
-  if (!LEVELS.includes(reg.level)) errors.level = "Select your level.";
+  const firstName = String(body.firstName || body.first_name || "").trim();
+  const secondName = String(body.secondName || body.second_name || "").trim();
+  const fullName = String(
+    body.fullName ||
+      body.full_name ||
+      body.name ||
+      `${firstName} ${secondName}`
+  ).trim();
+  const email = String(body.email || "").trim().toLowerCase();
+  const phone = String(body.phone || "").trim();
+  const matricNumber = String(
+    body.matricNumber || body.matric_number || ""
+  ).trim();
+  const department = String(body.department || "").trim();
+  const level = String(body.level || "").trim();
+  const hackathonParticipation = String(
+    body.hackathonParticipation ||
+      body.hackathon_participation ||
+      body.focusArea ||
+      body.focus_area ||
+      body.track ||
+      ""
+  ).trim();
+  const consent = Boolean(body.consent ?? true);
 
-  if (Object.keys(errors).length) {
-    return res.status(400).json({ error: "Check the highlighted fields.", errors });
+  if (!fullName || !email) {
+    return res.status(400).json({ error: "Name and Email are required." });
   }
 
   try {
-    const pool = await db();
-    await pool.query(
-      `INSERT INTO registrations (first_name, last_name, phone, email, department, level)
-       VALUES ($1, $2, $3, $4, $5, $6)`,
-      [reg.firstName, reg.lastName, reg.phone, reg.email, reg.department, reg.level]
+    const result = await db.query(
+      `INSERT INTO registrations (
+         first_name,
+         second_name,
+         full_name,
+         name,
+         email,
+         phone,
+         matric_number,
+         department,
+         level,
+         hackathon_participation,
+         focus_area,
+         track,
+         consent
+       )
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
+       ON CONFLICT (email) DO UPDATE SET
+         first_name = EXCLUDED.first_name,
+         second_name = EXCLUDED.second_name,
+         full_name = EXCLUDED.full_name,
+         name = EXCLUDED.name,
+         phone = EXCLUDED.phone,
+         matric_number = EXCLUDED.matric_number,
+         department = EXCLUDED.department,
+         level = EXCLUDED.level,
+         hackathon_participation = EXCLUDED.hackathon_participation,
+         focus_area = EXCLUDED.focus_area,
+         track = EXCLUDED.track,
+         consent = EXCLUDED.consent
+       RETURNING *`,
+      [
+        firstName,
+        secondName,
+        fullName,
+        fullName,
+        email,
+        phone,
+        matricNumber,
+        department,
+        level,
+        hackathonParticipation,
+        hackathonParticipation,
+        hackathonParticipation,
+        consent,
+      ]
     );
-  } catch (err) {
-    if (err && err.code === "23505") {
-      return res.status(409).json({
-        error: "This email is already registered.",
-        errors: { email: "This email is already registered." },
+
+    if (process.env.GMAIL_USER && process.env.GMAIL_APP_PASSWORD) {
+      sendMail({
+        to: email,
+        subject: "Registration Confirmed",
+        text: `Hi ${fullName},\n\nYour registration has been received.\n\nMatric Number: ${matricNumber}\nDepartment: ${department}\nLevel: ${level}\nHackathon: ${hackathonParticipation}`,
+        html: `<p>Hi <strong>${fullName}</strong>,</p><p>Your registration has been received.</p><ul><li><strong>Matric Number:</strong> ${matricNumber}</li><li><strong>Department:</strong> ${department}</li><li><strong>Level:</strong> ${level}</li><li><strong>Hackathon:</strong> ${hackathonParticipation}</li></ul>`,
+      }).catch((mailErr) => {
+        console.warn("Mail send warning:", mailErr.message);
       });
     }
-    console.error("register: database error", err);
-    return res.status(500).json({ error: "We could not save your registration. Try again in a moment." });
-  }
 
-  let emailSent = true;
-  try {
-    await sendConfirmation(reg);
-  } catch (err) {
-    emailSent = false;
-    console.error("register: email error", err);
+    return res.status(201).json({
+      message: "Registered",
+      registration: result.rows[0],
+    });
+  } catch (error) {
+    console.error("Registration error:", error);
+    return res.status(500).json({
+      error: error.message || "Registration failed",
+    });
   }
-
-  return res.status(201).json({ ok: true, emailSent });
 }

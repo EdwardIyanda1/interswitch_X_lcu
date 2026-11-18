@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo } from "react";
-import { LEVELS, FOCUS_AREAS, LOGOS } from "../config.js";
+import { LEVELS, HACKATHON_OPTIONS, LOGOS } from "../config.js";
 
 const TOKEN_KEY = "discovery_admin_token";
 
@@ -178,7 +178,7 @@ export default function Dashboard() {
 
   const [search, setSearch] = useState("");
   const [levelFilter, setLevelFilter] = useState("");
-  const [focusFilter, setFocusFilter] = useState("");
+  const [hackathonFilter, setHackathonFilter] = useState("");
 
   const interswitchSrc = LOGOS?.interswitch || "/logos/interswitch.svg";
   const lcuSrc = LOGOS?.lcu || "/logos/lcu.svg";
@@ -263,7 +263,14 @@ export default function Dashboard() {
       const matric = String(item.matric_number || item.matricNumber || "");
       const dept = String(item.department || "");
       const level = String(item.level || "");
-      const track = String(item.track || item.focus_area || item.focusArea || "");
+      const hackathon = String(
+        item.hackathon_participation ||
+          item.hackathonParticipation ||
+          item.track ||
+          item.focus_area ||
+          item.focusArea ||
+          ""
+      );
 
       const matchesSearch =
         !q ||
@@ -273,11 +280,12 @@ export default function Dashboard() {
         dept.toLowerCase().includes(q);
 
       const matchesLevel = !levelFilter || level === levelFilter;
-      const matchesFocus = !focusFilter || track === focusFilter;
+      const matchesHackathon =
+        !hackathonFilter || hackathon === hackathonFilter;
 
-      return matchesSearch && matchesLevel && matchesFocus;
+      return matchesSearch && matchesLevel && matchesHackathon;
     });
-  }, [registrations, search, levelFilter, focusFilter]);
+  }, [registrations, search, levelFilter, hackathonFilter]);
 
   const exportCsv = () => {
     if (!filtered.length) return;
@@ -288,7 +296,7 @@ export default function Dashboard() {
       "Matric Number",
       "Department",
       "Level",
-      "Focus Area",
+      "Hackathon",
       "Date",
     ];
     const lines = filtered.map((r) => [
@@ -298,7 +306,12 @@ export default function Dashboard() {
       r.matric_number || r.matricNumber || "",
       r.department || "",
       r.level || "",
-      r.track || r.focus_area || r.focusArea || "",
+      r.hackathon_participation ||
+        r.hackathonParticipation ||
+        r.track ||
+        r.focus_area ||
+        r.focusArea ||
+        "",
       r.created_at || "",
     ]);
     const csvContent = [headers, ...lines]
@@ -322,7 +335,6 @@ export default function Dashboard() {
         <div className="ref-split-card">
           <div className="ref-form-pane">
             <div className="ref-brand-row">
-              <span className="brand-cube" aria-hidden="true" />
               <div className="ref-brand-logos">
                 <img src={interswitchSrc} alt="Interswitch" />
                 <img src={lcuSrc} alt="LCU" />
@@ -410,15 +422,15 @@ export default function Dashboard() {
             </label>
 
             <label className="ref-field">
-              <span className="ref-label">Focus Area</span>
+              <span className="ref-label">Hackathon</span>
               <select
-                value={focusFilter}
-                onChange={(e) => setFocusFilter(e.target.value)}
+                value={hackathonFilter}
+                onChange={(e) => setHackathonFilter(e.target.value)}
               >
                 <option value="">All</option>
-                {(FOCUS_AREAS || []).map((area) => (
-                  <option key={area} value={area}>
-                    {area}
+                {(HACKATHON_OPTIONS || ["Yes", "No"]).map((opt) => (
+                  <option key={opt} value={opt}>
+                    {opt}
                   </option>
                 ))}
               </select>
@@ -464,7 +476,7 @@ export default function Dashboard() {
                 <th>Matric</th>
                 <th>Department</th>
                 <th>Level</th>
-                <th>Focus Area</th>
+                <th>Hackathon</th>
               </tr>
             </thead>
             <tbody>
@@ -476,7 +488,13 @@ export default function Dashboard() {
                   <td>{item.matric_number || item.matricNumber}</td>
                   <td>{item.department}</td>
                   <td>{item.level}</td>
-                  <td>{item.track || item.focus_area || item.focusArea}</td>
+                  <td>
+                    {item.hackathon_participation ||
+                      item.hackathonParticipation ||
+                      item.track ||
+                      item.focus_area ||
+                      item.focusArea}
+                  </td>
                 </tr>
               ))}
             </tbody>

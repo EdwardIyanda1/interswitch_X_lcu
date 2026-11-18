@@ -8,17 +8,11 @@ export const LEVELS = [
   "200 Level",
   "300 Level",
   "400 Level",
+  "500 Level",
 ];
 
-export const FOCUS_AREAS = [
-  "Software Engineering",
-  "Product Design (UI/UX)",
-  "Product Management",
-  "Data Science & AI",
-  "Cybersecurity",
-  "Cloud & DevOps",
-  "Fintech & Payments",
-];
+export const HACKATHON_OPTIONS = ["Yes", "No"];
+export const FOCUS_AREAS = HACKATHON_OPTIONS;
 
 export const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || "";
 
@@ -30,6 +24,7 @@ export function apiUrl(path) {
 export default {
   LOGOS,
   LEVELS,
+  HACKATHON_OPTIONS,
   FOCUS_AREAS,
   API_BASE_URL,
   apiUrl,
